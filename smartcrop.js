@@ -253,12 +253,16 @@
     }
   }
 
+  //Boost regions as specified by options (for example detected faces)
+  //od这个数组n+0--skin n+1--edge n+2--saturation n+3--第三方人脸识别 或者 其他插件
   function applyBoosts(options, output) {
     if (!options.boost) return;
     var od = output.data;
+    //这个理解有点晕,第一行的output中第三方插件分数清零?
     for (var i = 0; i < output.width; i += 4) {
       od[i + 3] = 0;
     }
+    //循环插件的数量, 一般只有一个:人脸识别
     for (i = 0; i < options.boost.length; i++) {
       applyBoost(options.boost[i], options, output);
     }
@@ -266,15 +270,18 @@
 
   function applyBoost(boost, options, output) {
     var od = output.data;
-    var w = output.width;
-    var x0 = ~~boost.x;
-    var x1 = ~~(boost.x + boost.width);
-    var y0 = ~~boost.y;
-    var y1 = ~~(boost.y + boost.height);
+    var width = output.width;
+    //~~ 两个波浪符 是取整的简写 等同于Math.trunc()
+    //这个可读性很差 但是性能很好,考虑到这个图像函数是效率优先的.这个写法可以理解.
+    //http://www.jstips.co/zh_cn/javascript/rounding-the-fast-way/
+    var x0 = ~~boost.x; //人脸识别的左上角 x轴
+    var x1 = ~~(boost.x + boost.width);//人脸识别右下角 x轴 
+    var y0 = ~~boost.y; //人脸识别的左上角 y轴
+    var y1 = ~~(boost.y + boost.height);//人脸识别右下角 y轴
     var weight = boost.weight * 255;
     for (var y = y0; y < y1; y++) {
       for (var x = x0; x < x1; x++) {
-        var i = (y * w + x) * 4;
+        var i = (y * width + x) * 4;
         od[i + 3] += weight;
       }
     }
