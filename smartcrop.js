@@ -403,6 +403,12 @@
   }
   smartcrop.importance = importance;
 
+  /* Attach the author reply
+    It's just an algorithm I made up on the spot.
+    I tried a more scientific approach here: https://github.com/jwagner/smartcrop.js/tree/human-skin-color-clustering.
+    In the end the results were similar enough for me not the change what was there and working.
+    I hope that helps.
+  */
   function skinColor(options, r, g, b) {
     var mag = sqrt(r * r + g * g + b * b);
     var rd = r / mag - options.skinColor[0];
