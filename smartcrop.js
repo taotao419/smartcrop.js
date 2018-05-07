@@ -30,11 +30,11 @@
   var smartcrop = {};
   // Promise implementation to use
   smartcrop.Promise =
-    typeof Promise !== 'undefined'
-      ? Promise
-      : function() {
-        throw new Error('No native promises and smartcrop.Promise not set.');
-      };
+    typeof Promise !== 'undefined' ?
+    Promise :
+    function() {
+      throw new Error('No native promises and smartcrop.Promise not set.');
+    };
 
   smartcrop.DEFAULTS = {
     width: 0,
@@ -173,54 +173,83 @@
     return true;
   };
 
-  function edgeDetect(i, o) {
-    var id = i.data;
-    var od = o.data;
-    var w = i.width;
-    var h = i.height;
+  /*
+  https://www.jianshu.com/p/2334bee37de5  -- [数字图像 - 边缘检测原理 - Sobel, Laplace, Canny算子]
+  其中解释了为啥要用二阶导数,因为在变化处/边缘
+  拉普拉斯是用二阶导数计算边缘,在连续函数下 , 在一阶导数图中极大值或极小值处 是边缘
+  在二阶导数图中 极大值或极小值之间过0点 被认为是边缘
+  导数基本公式: h: lim->0  (f(x+h)-f(x))/(x+h-x) 那么在计算机系统内 不可能逼近无穷小, h最小只能为1. 那么导数公式约等于f'(x)=(f(x+1)-f(x))/1
+  也就是[ f'(x)=f(x)-f(x-1) ]
+  二阶导数那就是 f'(f'(x))=(f(x)-f(x-1))-(f(x-1)-f(x-2))= f(x)-2f(x-1)+f(x-2)
+  那也可以理解为 f'(f'(x))=f(x+1)-2f(x)+f(x-1)
 
-    for (var y = 0; y < h; y++) {
-      for (var x = 0; x < w; x++) {
-        var p = (y * w + x) * 4;
+  二维公式则为 f'(f'(x,y))= -4 f(x, y) + f(x-1, y) + f(x+1, y) + f(x, y-1) + f(x, y+1)
+
+  -----------------------
+  |x-1,y-1|x,y-1|x+1,y-1|
+  -----------------------
+  |x-1,y  |x,y  |x+1,y  |
+  -----------------------
+  |x-1,y+1|x,y+1|x+1,y+1|
+  ----------------------- 
+
+  */
+  function edgeDetect(input, output) {
+    var inputData = input.data;
+    var outputData = output.data;
+    var width = input.width;
+    var height = input.height;
+
+    for (var y = 0; y < height; y++) {
+      for (var x = 0; x < width; x++) {
+        /*在Html5 Cavans 2DContext里面,point的RGBA格式是由一维数组表示,
+         (x,y)点对应的信息是
+         R=(y*width+x)*4+0
+         G=(y*width+x)*4+1
+         B=(y*width+x)*4+2
+         A=(y*width+x)*4+3
+        */
+        var point = (y * width + x) * 4;
         var lightness;
 
-        if (x === 0 || x >= w - 1 || y === 0 || y >= h - 1) {
-          lightness = sample(id, p);
+        if (x === 0 || x >= width - 1 || y === 0 || y >= height - 1) {
+          lightness = sample(inputData, point);
         } else {
+          //对于3*3的区域,经验上被推荐最多的形式是 f=4*z5-(z2+z4+z6+z8)
           lightness =
-            sample(id, p) * 4 -
-            sample(id, p - w * 4) -
-            sample(id, p - 4) -
-            sample(id, p + 4) -
-            sample(id, p + w * 4);
+            sample(inputData, point) * 4 - //坐标 x,y
+            sample(inputData, point - width * 4) - //坐标 x,y-1
+            sample(inputData, point - 4) - //坐标 x-1,y
+            sample(inputData, point + 4) - //坐标 x+1,y
+            sample(inputData, point + width * 4); //坐标 x,y+1
         }
 
-        od[p + 1] = lightness;
+        outputData[point + 1] = lightness;
       }
     }
   }
 
-  function skinDetect(options, i, o) {
-    var id = i.data;
-    var od = o.data;
-    var w = i.width;
-    var h = i.height;
+  function skinDetect(options, input, output) {
+    var inputData = input.data;
+    var outputData = output.data;
+    var width = input.width;
+    var height = input.height;
 
-    for (var y = 0; y < h; y++) {
-      for (var x = 0; x < w; x++) {
-        var p = (y * w + x) * 4;
-        var lightness = cie(id[p], id[p + 1], id[p + 2]) / 255;
-        var skin = skinColor(options, id[p], id[p + 1], id[p + 2]);
+    for (var y = 0; y < heigth; y++) {
+      for (var x = 0; x < width; x++) {
+        var point = (y * width + x) * 4; //参考Ln205解释
+        var lightness = cie(inputData[point], inputData[point + 1], inputData[point + 2]) / 255;
+        var skin = skinColor(options, inputData[point], inputData[point + 1], inputData[point + 2]);
         var isSkinColor = skin > options.skinThreshold;
         var isSkinBrightness =
           lightness >= options.skinBrightnessMin &&
           lightness <= options.skinBrightnessMax;
         if (isSkinColor && isSkinBrightness) {
-          od[p] =
+          outputData[point] =
             (skin - options.skinThreshold) *
             (255 / (1 - options.skinThreshold));
         } else {
-          od[p] = 0;
+          outputData[point] = 0;
         }
       }
     }
@@ -275,9 +304,9 @@
     //这个可读性很差 但是性能很好,考虑到这个图像函数是效率优先的.这个写法可以理解.
     //http://www.jstips.co/zh_cn/javascript/rounding-the-fast-way/
     var x0 = ~~boost.x; //人脸识别的左上角 x轴
-    var x1 = ~~(boost.x + boost.width);//人脸识别右下角 x轴 
+    var x1 = ~~(boost.x + boost.width); //人脸识别右下角 x轴 
     var y0 = ~~boost.y; //人脸识别的左上角 y轴
-    var y1 = ~~(boost.y + boost.height);//人脸识别右下角 y轴
+    var y1 = ~~(boost.y + boost.height); //人脸识别右下角 y轴
     var weight = boost.weight * 255;
     for (var y = y0; y < y1; y++) {
       for (var x = x0; x < x1; x++) {
@@ -293,9 +322,7 @@
     var cropWidth = options.cropWidth || minDimension;
     var cropHeight = options.cropHeight || minDimension;
     for (
-      var scale = options.maxScale;
-      scale >= options.minScale;
-      scale -= options.scaleStep
+      var scale = options.maxScale; scale >= options.minScale; scale -= options.scaleStep
     ) {
       for (var y = 0; y + cropHeight * scale <= height; y += options.step) {
         for (var x = 0; x + cropWidth * scale <= width; x += options.step) {
@@ -568,9 +595,11 @@
   function cie(r, g, b) {
     return 0.5126 * b + 0.7152 * g + 0.0722 * r;
   }
+
   function sample(id, p) {
     return cie(id[p], id[p + 1], id[p + 2]);
   }
+
   function saturation(r, g, b) {
     var maximum = max(r / 255, g / 255, b / 255);
     var minumum = min(r / 255, g / 255, b / 255);
