@@ -316,14 +316,18 @@
     }
   }
 
+  /*
+  生成一大组crops,也就是各种长宽比例的矩形范围.
+  */
   function generateCrops(options, width, height) {
     var results = [];
     var minDimension = min(width, height);
-    var cropWidth = options.cropWidth || minDimension;
+    var cropWidth = options.cropWidth || minDimension;//有option使用option设置的数值,没有则选minDimension
     var cropHeight = options.cropHeight || minDimension;
     for (
       var scale = options.maxScale; scale >= options.minScale; scale -= options.scaleStep
     ) {
+      //取样因子就是step=8,所以每个crop与下个crop间距就是8
       for (var y = 0; y + cropHeight * scale <= height; y += options.step) {
         for (var x = 0; x + cropWidth * scale <= width; x += options.step) {
           results.push({
@@ -338,6 +342,8 @@
     return results;
   }
 
+  //给每个crop打分,这个矩形范围内所有采样点 按照detail;saturation;skin;boost ,各自累加.
+  //然后按照各个系数的权重,给这个crop打总分.
   function score(options, output, crop) {
     var result = {
       detail: 0,
@@ -465,6 +471,10 @@
   }
   smartcrop.ImgData = ImgData;
 
+  /*
+  降采样,即采样点减少.对于一幅N*M的图像来说,如果采样系数为k(这里为8),则是在每行每列每隔k个点去一个点组成图像.
+  降采样很容易实现.实现的算法我还没找到对应的文档.
+  */
   function downSample(input, factor) {
     var idata = input.data;
     var iwidth = input.width;
