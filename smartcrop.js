@@ -29,6 +29,7 @@
 
   var smartcrop = {};
   // Promise implementation to use
+  // Promise 就是一个对象，用来传递异步操作的消息。它代表了某个未来才会知道结果的事件（通常是一个异步操作）
   smartcrop.Promise =
     typeof Promise !== 'undefined' ?
     Promise :
@@ -91,7 +92,7 @@
 
     // open the image
     return iop
-      .open(inputImage, options.input)
+      .open(inputImage, options.input) //Javascript Promise : eventual completion (or failure) of an asynchronous operation, and its resulting value.
       .then(function(image) {
         // calculate desired crop dimensions based on the image size
         if (options.width && options.height) {
@@ -439,6 +440,7 @@
     var topCrop = null;
     var crops = generateCrops(options, input.width, input.height);
 
+    //循环所有可能的截图区域,获得最高分的区域,和最高分.
     for (var i = 0, iLen = crops.length; i < iLen; i++) {
       var crop = crops[i];
       crop.score = score(options, scoreOutput, crop);
@@ -558,6 +560,15 @@
           var c = canvasFactory(~~width, ~~height);
           var ctx = c.getContext('2d');
 
+          //ctx.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+          //sx 需要绘制到目标上下文中的，源图像的矩形选择框的左上角 X 坐标。
+          //sy 需要绘制到目标上下文中的，源图像的矩形选择框的左上角 Y 坐标。
+          //sWidth 需要绘制到目标上下文中的，源图像的矩形选择框的宽度。如果不说明，整个矩形从坐标的sx和sy开始，到图像的右下角结束。
+          //sHeight 需要绘制到目标上下文中的，源图像的矩形选择框的高度。
+          //dx 目标画布的左上角在目标canvas上 X 轴的位置。
+          //dy 目标画布的左上角在目标canvas上 Y 轴的位置。
+          //dWidth 在目标画布上绘制图像的宽度。 允许对绘制的图像进行缩放。 如果不说明， 在绘制时图片宽度不会缩放。
+          //dHeight 在目标画布上绘制图像的高度。 允许对绘制的图像进行缩放。 如果不说明， 在绘制时图片高度不会缩放。
           ctx.drawImage(
             image,
             0,
@@ -573,6 +584,7 @@
         });
       },
       getData: function(image) {
+        //Uint8ClampedArray Image每个点x有4个信息RGBA [x+0],[x+1],[x+2],[x+3],用一维数组存储读写效率高.
         return Promise.resolve(image).then(function(c) {
           var ctx = c.getContext('2d');
           var id = ctx.getImageData(0, 0, c.width, c.height);
